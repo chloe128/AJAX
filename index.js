@@ -11,7 +11,8 @@ const progressBar = document.getElementById("progressBar");
 const getFavouritesBtn = document.getElementById("getFavouritesBtn");
 
 // Step 0: Store your API key here for reference and easy access.
-const API_KEY = "";
+const API_KEY =
+  "live_RNgAGeuGRjyhsP8qY77gYToskB1ksyARKqhzBZvJ1tzQTJLa2JPfe6CC2HuRySAg";
 
 /**
  * 1. Create an async function "initialLoad" that does the following:
@@ -21,6 +22,34 @@ const API_KEY = "";
  *  - Each option should display text equal to the name of the breed.
  * This function should execute immediately.
  */
+//
+async function initialLoad() {
+  try {
+    const response = await fetch("https://api.thecatapi.com/v1/breeds", {
+      headers: {
+        "x-api-key": API_KEY,
+      },
+    });
+    const data = await response.json();
+    console.log(data);
+    data.forEach((breed) => {
+      const option = document.createElement("option");
+      option.value = breed.id;
+      option.textContent = breed.name;
+      breedSelect.appendChild(option);
+      //<option value="persian">Persian</option>
+    });
+    //Add a call to this function to the end of your initialLoad function above to create the initial carousel
+
+    if (data) {
+      const initialCar = data[0].id;
+      await loadCat(initialCar);
+    }
+  } catch (error) {
+    console.error("initialLoad failed", error);
+  }
+}
+initialLoad();
 
 /**
  * 2. Create an event handler for breedSelect that does the following:
@@ -36,6 +65,63 @@ const API_KEY = "";
  * - Each new selection should clear, re-populate, and restart the Carousel.
  * - Add a call to this function to the end of your initialLoad function above to create the initial carousel.
  */
+
+breedSelect.addEventListener("change", async () => {
+  const breedId = event.target.value;
+  //console.log(breedId); //first 4 character:abys
+  await loadCat(breedId);
+});
+async function loadCat(breedId) {
+  try {
+    const response = await fetch(
+      `https://api.thecatapi.com/v1/images/search?limit=10&breed_ids=${breedId}`,
+      {
+        headers: {
+          "x-api-key": API_KEY,
+        },
+      }
+    );
+    const data = await response.json();
+    //console.log(data);
+    //clear previous img and infodump
+    Carousel.clear();
+    infoDump.innerHTML = "";
+    //add description to infodump
+    const breedsData = data[0].breeds[0];
+    const desc = document.createElement("div");
+    desc.innerHTML = `<h2><b>Breed: </b>${breedsData.name}</h2>
+    <p><b>Description: </b>${breedsData.description}</p>
+    <p><b>Life Span: </b>${breedsData.life_span}</p>
+    <p><b>Origin: </b>${breedsData.origin}</p>
+    <p><b>temperament: </b>${breedsData.temperament}</p>`;
+    infoDump.appendChild(desc);
+    //For each object in the response array, create a new element for the carousel.
+
+    data.forEach((ele, index) => {
+      const newCarouselEle = Carousel.createCarouselItem(
+        //imgSrc, imgAlt, imgId
+        ele.url,
+        ele.breeds[0].name,
+        ele.id
+      );
+
+      const favButton = newCarouselEle.querySelector(".favourite-button");
+      favButton.addEventListener("click", async () => {
+        const isFavorited = await favourite(ele.id);
+        if (isFavorited) {
+          favButton.classList.add("favorited");
+        } else {
+          favButton.classList.remove("favorited");
+        }
+      });
+      Carousel.appendCarousel(newCarouselEle);
+      //console.log(Carousel);
+    });
+    Carousel.start();
+  } catch (error) {
+    "Load breed info failed", error;
+  }
+}
 
 /**
  * 3. Fork your own sandbox, creating a new one named "JavaScript Axios Lab."
@@ -90,6 +176,20 @@ const API_KEY = "";
  */
 export async function favourite(imgId) {
   // your code here
+  try {
+    const response = await axios.get("/favourites");
+    const fav = response.data;
+    const findFav = fav.find((f) => f.image_id == imgId);
+    if (findFav) {
+      await axios.delete(`/favourites/${findFav.id}`);
+      return false;
+    } else {
+      await axios.post("/favourites", { image_id: imgId });
+      return true;
+    }
+  } catch (error) {
+    console.error("Error on toggle favourite");
+  }
 }
 
 /**
@@ -101,7 +201,30 @@ export async function favourite(imgId) {
  *    If that isn't in its own function, maybe it should be so you don't have to
  *    repeat yourself in this section.
  */
+getFavouritesBtn.addEventListener("click", async () => {
+  try {
+    const response = await axios.get("/favourites");
+    const favourites = response.data;
 
+    Carousel.clear();
+    infoDump.innerHTML = "";
+
+    favourites.forEach((fav) => {
+      const carouselItem = Carousel.createCarouselItem(
+        fav.image.url,
+        "Favourite Image",
+        fav.image_id
+      );
+      const favButton = carouselItem.querySelector(".favourite-button");
+      favButton.classList.add("favorited");
+      Carousel.appendCarousel(carouselItem);
+    });
+
+    Carousel.start();
+  } catch (error) {
+    console.error("Error fetching favourites failed", error);
+  }
+});
 /**
  * 10. Test your site, thoroughly!
  * - What happens when you try to load the Malayan breed?
